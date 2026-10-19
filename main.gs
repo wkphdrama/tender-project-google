@@ -1,7 +1,10 @@
+// 留空使用部署執行者的主要日曆；也可填入具有編輯權限的共用日曆 ID。
+const PAYMENT_CALENDAR_ID = 'b32dd7f29405073bbd73d73eb780dc2a36825534d3ba925149e3267302ea5a31@group.calendar.google.com';
+
 const MASTER_SHEET_NAME = '總表';
 const USER_MAP_SHEET = '使用者對照表';
-const HANDLER_HEADERS = ['負責人', '購案名稱', '承攬廠商',	'聯絡人', '開始日期', '結束日期', '計畫金額','年度分配','類型','經費分擔計畫',	'分攤經費',	'採購案號','備註', '狀態', '最後更新時間'];
-const MASTER_HEADERS = ['負責人', '購案名稱', '承攬廠商',	'聯絡人', '開案日期', '結案日期', '計畫金額','年度分配','類型','經費分擔計畫',	'分攤經費',	'採購案號','備註', '狀態'];
+const HANDLER_HEADERS = ['負責人', '購案名稱', '承攬廠商',	'聯絡人', '開始日期', '結束日期', '計畫金額','年度分配','類型','經費分擔計畫',	'採購案號','備註', '狀態', '最後更新時間'];
+const MASTER_HEADERS = ['負責人', '購案名稱', '承攬廠商',	'聯絡人', '開案日期', '結案日期', '計畫金額','年度分配','類型','經費分擔計畫',	'採購案號','備註', '狀態'];
 
 function doGet() {
   return HtmlService.createTemplateFromFile('Index')
@@ -119,7 +122,9 @@ function searchMasteryr(yr){
       const row = data[i];
       if (!row[1]) continue; // 略過空列
       const yrAmount = row[7];
+      const otherAmount = row[9];
       let matchAmount = '';
+      let matchOtheramount = '';
       let totalAmount = 0;
       let monthDetail = [];
       for (let m = 0 ; m < 12 ; m++){
@@ -131,17 +136,37 @@ function searchMasteryr(yr){
       for (let k = 0 ; k < paygroup.length ; k++){
           payAmount = parseFloat(paygroup[k].split('__')[0]);
           payDate = paygroup[k].split('__')[2];
-          if (payDate == ''){
-            continue;
-          }
-          if (payDate.split('-')[0] == yr){
-              matchAmount += paygroup[k]+'\n';
-              totalAmount += payAmount;
-              month = parseInt(payDate.split('-')[1],10)
-              monthDetail[ month-1 ] += String( payAmount )+'\n';
+          if (payDate){
+            if(payDate==''){
+              continue;
+            }
+            if (payDate.split('-')[0] == yr){
+                matchAmount += paygroup[k]+'\n';
+                totalAmount += payAmount;
+                month = parseInt(payDate.split('-')[1],10)
+                monthDetail[ month-1 ] += String( payAmount )+'\n';
+            }
           }
 
       }
+
+      paygroup = otherAmount.split('\n');
+      for (let k = 0 ; k < paygroup.length ; k++){
+          payDate = paygroup[k].split('__')[2];
+          if (payDate){
+            if(payDate==''){
+              continue;
+            }
+            if (payDate.split('-')[0] == yr){
+              matchOtheramount += paygroup[k]+'\n';
+            }
+          }
+          
+
+      }
+
+
+
       if (totalAmount != 0){
         result.push({
           handler: row[0],
@@ -153,11 +178,10 @@ function searchMasteryr(yr){
           amount: totalAmount,
           yrAmount: matchAmount,
           planType: row[8],
-          otherPlan: row[9],
-          otherAmount: row[10],
-          planNo:row[11],
-          remark:row[12],
-          status:row[13],
+          otherAmount: matchOtheramount,
+          planNo:row[10],
+          remark:row[11],
+          status:row[12],
           monthDetail : monthDetail
         });
       }
@@ -189,12 +213,11 @@ function getMyRecords() {
       amount: row[6],
       yrAmount: row[7],
       planType: row[8],
-      otherPlan: row[9],
-      otherAmount: row[10],
-      planNo:row[11],
-      remark:row[12],
-      status:row[13],
-      timestamp:formatDateTime_(row[14]),
+      otherAmount: row[9],
+      planNo:row[10],
+      remark:row[11],
+      status:row[12],
+      timestamp:formatDateTime_(row[13]),
     });
   }
   
@@ -221,8 +244,9 @@ function addRecord(record) {
   const planName = String(record.planName || '').trim();
   if (!planName) throw new Error('請填寫計劃名');
 
+  const payments = parsePaymentDates_(record.yrAmount);
   const timestamp = new Date();
-  handlerrow =  [
+  const handlerrow =  [
       handlerName,
       planName,
       record.contractor,
@@ -232,7 +256,6 @@ function addRecord(record) {
       record.amount,
       record.yrAmount,
       record.planType,
-      record.otherPlan,
       record.otherAmount,
       record.planNo,
       record.remark,
@@ -251,7 +274,7 @@ function addRecord(record) {
     const data = sheet.getDataRange().getValues();
     for (let i = data.length - 1; i >= 1; i--) {
       if (data[i][1] === planName) {
-        sheet.getRange(i + 1, 1, 1, 15).setValues([handlerrow])
+        sheet.getRange(i + 1, 1, 1, 14).setValues([handlerrow])
         update = 1;
       }
     }
@@ -264,6 +287,11 @@ function addRecord(record) {
 
     const latest = getplanFromHandlerSheet_(sheet, planName);
     upsertMaster_(latest);
+    try {
+      syncPaymentCalendar_(latest, payments);
+    } catch (error) {
+      throw new Error('試算表已儲存，但日曆同步未完成。請確認日曆授權與編輯權限，再以相同購案名稱重新送出。原因：' + error.message);
+    }
   } finally {
     lock.releaseLock();
   }
@@ -277,7 +305,7 @@ function recalcLatestStatus_(sheet, planName) {
   let latestTime = null;
   for (let i = 1; i < data.length; i++) {
     if (data[i][1] === planName) {
-      const t = data[i][15];
+      const t = data[i][14];
       if (latestTime === null || (t instanceof Date && t > latestTime)) {
         latestTime = t;
         latestRow = i;
@@ -286,7 +314,7 @@ function recalcLatestStatus_(sheet, planName) {
   }
   for (let i = 1; i < data.length; i++) {
     if (data[i][1] === planName) {
-      sheet.getRange(i + 1, 15).setValue(i === latestRow ? '現況' : '');
+      sheet.getRange(i + 1, 14).setValue(i === latestRow ? '現況' : '');
     }
   }
 }
@@ -306,11 +334,10 @@ function getplanFromHandlerSheet_(sheet, planName) {
         amount: data[i][6],
         yrAmount: data[i][7],
         planType: data[i][8],
-        otherPlan: data[i][9],
-        otherAmount: data[i][10],
-        planNo:data[i][11],
-        remark:data[i][12],
-        status:data[i][13]
+        otherAmount: data[i][9],
+        planNo:data[i][10],
+        remark:data[i][11],
+        status:data[i][12]
       };
     }
   }
@@ -325,7 +352,7 @@ function upsertMaster_(record) {
   const now = new Date();
   for (let i = 1; i < data.length; i++) {
     if (data[i][1] === record.planName) {
-      sheet.getRange(i + 1, 1, 1, 14).setValues([[
+      sheet.getRange(i + 1, 1, 1, 13).setValues([[
               record.handler,
               record.planName,
               record.contractor,
@@ -335,7 +362,6 @@ function upsertMaster_(record) {
               record.amount,
               record.yrAmount,
               record.planType,
-              record.otherPlan,
               record.otherAmount,
               record.planNo,
               record.remark,
@@ -354,9 +380,82 @@ function upsertMaster_(record) {
               record.amount,
               record.yrAmount,
               record.planType,
-              record.otherPlan,
               record.otherAmount,
               record.planNo,
               record.remark,
               record.status,]);
+}
+/* ---------- 付款分配日期同步 Google 日曆 ---------- */
+
+// 年度分配格式：金額__比例__YYYY-MM-DD，每行一期；空日期不建立事件。
+function parsePaymentDates_(value) {
+  const payments = [];
+  String(value || '').split('\n').forEach((line, index) => {
+    if (!line.trim()) return;
+    const fields = line.split('__');
+    const dateText = String(fields[2] || '').trim();
+    if (!dateText) return;
+    const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(dateText);
+    if (!match) throw new Error('第 ' + (index + 1) + ' 期分配日期格式錯誤');
+    const check = new Date(Date.UTC(Number(match[1]), Number(match[2]) - 1, Number(match[3])));
+    if (check.getUTCFullYear() !== Number(match[1]) ||
+        check.getUTCMonth() !== Number(match[2]) - 1 ||
+        check.getUTCDate() !== Number(match[3])) {
+      throw new Error('第 ' + (index + 1) + ' 期分配日期不存在');
+    }
+    payments.push({ period: String(index + 1), amount: fields[0] || '', ratio: fields[1] || '', date: dateText });
+  });
+  return payments;
+}
+
+function syncPaymentCalendar_(record, payments) {
+  const calendar = PAYMENT_CALENDAR_ID
+    ? CalendarApp.getCalendarById(PAYMENT_CALENDAR_ID)
+    : CalendarApp.getDefaultCalendar();
+  if (!calendar) throw new Error('找不到指定的 Google 日曆');
+
+  // 使用試算表、日曆、承辦人、購案名稱隔離事件；保持與既有購案更新鍵一致。
+  const identity = JSON.stringify([
+    SpreadsheetApp.getActiveSpreadsheet().getId(), calendar.getId(), record.handler, record.planName
+  ]);
+  const digest = Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, identity, Utilities.Charset.UTF_8);
+  const key = 'paymentCalendar:' + Utilities.base64EncodeWebSafe(digest);
+  const properties = PropertiesService.getScriptProperties();
+  const eventIds = JSON.parse(properties.getProperty(key) || '{}');
+  const retained = new Set(payments.map(payment => payment.period));
+
+  payments.forEach(payment => {
+    const title = record.planName + '｜第 ' + payment.period + ' 期付款';
+    const description = [
+      '負責人：' + record.handler,
+      '承攬廠商：' + (record.contractor || ''),
+      '分配金額（千元）：' + payment.amount,
+      '比例（%）：' + payment.ratio,
+      '採購案號：' + (record.planNo || ''),
+      '狀態：' + (record.status || ''),
+      '備註：' + (record.remark || '')
+    ].join('\n');
+    // CalendarApp 的日期按指令碼時區解讀；使用中午避免跨日邊界。
+    const date = Utilities.parseDate(payment.date + ' 12:00:00', Session.getScriptTimeZone(), 'yyyy-MM-dd HH:mm:ss');
+    let event = eventIds[payment.period] ? calendar.getEventById(eventIds[payment.period]) : null;
+    if (event) {
+      event.setTitle(title);
+      event.setDescription(description);
+      event.setAllDayDate(date);
+    } else {
+      event = calendar.createAllDayEvent(title, date, { description });
+      eventIds[payment.period] = event.getId();
+      // 每建立一期立即記錄，後續失敗重送時可更新已完成的事件。
+      properties.setProperty(key, JSON.stringify(eventIds));
+    }
+  });
+
+  Object.keys(eventIds).forEach(period => {
+    if (retained.has(period)) return;
+    const event = calendar.getEventById(eventIds[period]);
+    if (event) event.deleteEvent();
+    delete eventIds[period];
+    properties.setProperty(key, JSON.stringify(eventIds));
+  });
+  if (Object.keys(eventIds).length === 0) properties.deleteProperty(key);
 }
