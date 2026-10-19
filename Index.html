@@ -6,9 +6,8 @@
     body { font-family: "Microsoft JhengHei", Arial, sans-serif; margin: 24px; color:#222; }
     h2 { margin-bottom: 4px; }
     #setupBox { background:#f5f5f5; padding:16px; border-radius:8px; max-width:420px; }
-    table { border-collapse: collapse; width: 100%; margin-top: 16px; }
-    th, td { border: 1px solid #ddd; padding: 8px; font-size: 13px; text-align:left; }
-    th { background: #f0f0f0; }
+    .record-table { margin-top: 16px; font-size: 13px; }
+    .tabulator .tabulator-cell { white-space: pre-wrap; word-break: break-word; }
     input { padding: 6px 8px; }
     button { padding: 6px 12px; cursor:pointer; margin: 2px; }
     .form-row { display:flex; gap:8px; flex-wrap:wrap; margin-bottom:8px; }
@@ -18,10 +17,6 @@
     .badge-latest { background:#2ecc71; color:#fff; padding:2px 6px; border-radius:4px; font-size:12px; }
     .badge-old { color:#999; font-size:12px; }
     .hint { color:#888; font-size:12px; margin-bottom:12px; }
-    .record-table td {
-      white-space: pre-wrap;
-      word-break: break-word; /* 避免長英文單字或網址把欄位撐太寬 */
-     }
   </style>
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/css/bootstrap.min.css" rel="stylesheet">
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/js/bootstrap.min.js"></script>
@@ -30,47 +25,54 @@
 </head>
 <body>
   <div class="container-fluid">
-   
+
     <div class="row" id="loading" style="display:block;">
-        <H1>Loading...</H1>
+      <h1>Loading...</h1>
     </div>
+
     <div class="row" id="setupBox" style="display:none;">
-      <p>第一次使用,請輸入你在「承辦人」欄位中對應的姓名:</p>
-      <input id="handlerNameInput" placeholder="例如: 王小明">
+      <p>第一次使用，請輸入你在「承辦人」欄位中對應的姓名：</p>
+      <input id="handlerNameInput" placeholder="例如：王小明">
       <button onclick="saveHandlerName()">確認</button>
     </div>
 
     <div class="row" id="mainBox" style="display:none;">
       <h2>我的計畫紀錄</h2>
       <p id="whoami"></p>
-      <p class="hint">每次送出都是「新增一筆紀錄」,不會覆蓋舊資料。若要修改某個計畫,直接重新填一次表單送出即可,系統會自動把最新的一筆標記為「最新」。</p>
+      <p class="hint">每次送出都是「新增一筆紀錄」，不會覆蓋舊資料。若要修改某個計畫，直接重新填一次表單送出即可，系統會自動把最新的一筆標記為「最新」。</p>
       <div id="msg"></div>
+
       <div class="modal" id="inputModal" tabindex="-1">
-        <div class="modal-dialog modal-xl" >
-        <div class="modal-content">
-          <div class="modal-header">
-            <h5 id="formTitle">新增 / 更新一筆紀錄</h3>
-            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-          </div>
-          <div class="modal-body">
-            <div class="form-row">
-              <input class="form-control" id="planName" placeholder="購案名稱">
-              <input class="form-control" id="contractor" placeholder="承攬廠商">
-              <input class="form-control" id="contectName" placeholder="聯絡人"> 
-              <input class="form-control" id="startDate" type="date">
-              <input class="form-control" id="endDate" type="date">
-              <input class="form-control" id="amount" placeholder="金額" type="number">  
-              <input class="form-control" id="planNo" placeholder="採購案號">
-              <input class="form-control" id="remark" placeholder="備註">
-              <select id="status">
+        <div class="modal-dialog modal-xl">
+          <div class="modal-content">
+            <div class="modal-header">
+              <h5 id="formTitle">新增 / 更新一筆紀錄</h5>
+              <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+
+            <div class="modal-body">
+              <div class="form-row">
+                <input class="form-control" id="planName" placeholder="購案名稱">
+                <input class="form-control" id="planNo" placeholder="採購案號">
+              </div>
+              <div class="form-row">               
+                <input class="form-control" id="contractor" placeholder="承攬廠商">
+                <input class="form-control" id="contectName" placeholder="聯絡人">
+                <input class="form-control" id="startDate" type="date">
+                <input class="form-control" id="endDate" type="date">
+                <input class="form-control" id="amount" placeholder="金額" type="number" onchange="calLastamount()">
+                <select id="status">
                   <option value="規劃" selected>規劃</option>
                   <option value="發案">發案</option>
                   <option value="執行">執行</option>
                   <option value="結案">結案</option>
-              </select>
-            </div>
-            <div class="form-row">
-                <span>付款期數:</span>
+                </select>
+              </div>
+              <div class="form-row">
+                <textarea class="form-control" id="remark" placeholder="備註" rows="5" cols="33"></textarea>
+              </div>
+              <div class="form-row">
+                <span>付款期數：</span>
                 <select id="paytimes">
                   <option value="1" selected>1</option>
                   <option value="2">2</option>
@@ -81,16 +83,16 @@
                   <option value="7">7</option>
                   <option value="8">8</option>
                 </select>
-                <span>剩餘金額</span>
-                <span id="lastAmount"></span>
-                
-            </div>
-            <div class="form-row">
-               <div id="payinfo">
-                </div>
-            </div>  
-            <div class="form-row">
-                <span>外部支應期數:</span>
+                <span>剩餘金額:</span>
+                <span id="lastAmount">-</span>
+              </div>
+
+              <div class="form-row">
+                <div id="payinfo"></div>
+              </div>
+
+              <div class="form-row">
+                <span>外部支應期數：</span>
                 <select id="other_paytimes">
                   <option value="0" selected>0</option>
                   <option value="1">1</option>
@@ -102,66 +104,58 @@
                   <option value="7">7</option>
                   <option value="8">8</option>
                 </select>
-                
+              </div>
+
+              <div class="form-row">
+                <div id="other_payinfo"></div>
+              </div>
+
             </div>
-            <div class="form-row">
-               <div id="other_payinfo">
-                </div>
-            </div>  
-            <div class="form-row">
-                <input class="form-control" id="otherPlan" placeholder="經費分擔計畫"> 
-                <input class="form-control" id="otherAmount" placeholder="分攤經費" type="number"> 
-            </div>  
+
+            <div class="modal-footer">
+              <button type="button" class="btn btn-primary" onclick="submitRecord()">送出(新增一筆)</button>
+              <button type="button" class="btn btn-primary" onclick="resetForm()">清空表單</button>
+            </div>
           </div>
-          <div class="modal-footer">
-            <button type="button" class="btn btn-primary" onclick="submitRecord()">送出(新增一筆)</button>
-            <button type="button" class="btn btn-primary" onclick="resetForm()">清空表單</button>
-          </div>  
         </div>
-        </div>    
-      </div> 
+      </div>
+
       <div class="row">
         <div class="col">
-          <button type="button" class="btn btn-primary" onclick="addnew()" >新增</button>
-          <table id="recordTable" class="record-table">
-            <thead>
-              <tr>
-                <th>購案名稱</th><th>承攬廠商</th><th>聯絡人</th><th>開案日期</th><th>結案日期</th><th>金額(千元)</th><th>分配(金額__比例__日期)</th><th>類型</th><th>經費分擔計畫</th><th>分攤經費</th><th>採購案號</th><th>備註</th><th>狀態</th><th>更新日期</th><th>功能</th>
-              </tr>
-            </thead>
-            <tbody></tbody>
-          </table>
+          <button type="button" class="btn btn-primary" onclick="addnew()">新增</button>
+          <div id="recordTable" class="record-table"></div>
           <hr>
         </div>
       </div>
-      <div class="row search" >
-        <div class="col">
-             <h5 id="formTitle">搜尋</h3>
-            <span>搜尋年分(西元)</span><input class="" id="selectyr">
-            <button type="button" class="btn btn-primary" onclick="search()" >search</button>
-        </div>
-      </div>
+
       <div class="row search">
         <div class="col">
-          <table id="yearTable" class="record-table">
-            <thead>
-              <tr>
-                <th>購案名稱</th><th>開案日期</th><th>結案日期</th><th>合計金額(千元)</th><th>分配</th><th>分攤計畫</th><th>備註</th><th>狀態</th><th>1月</th><th>2月</th><th>3月</th><th>4月</th><th>5月</th><th>6月</th><th>7月</th><th>8月</th><th>9月</th><th>10月</th><th>11月</th><th>12月</th>
-              </tr>
-            </thead>
-            <tbody></tbody>
-          </table>
+          <h5>搜尋</h5>
+          <span>搜尋年分(西元)</span>
+          <input id="selectyr">
+          <button type="button" class="btn btn-primary" onclick="search()">search</button>
         </div>
       </div>
+
+      <div class="row search">
+        <div class="col">
+          <div id="yearTable" class="record-table"></div>
+        </div>
+      </div>
+    </div>
   </div>
 
 <script>
   const inputmodal = bootstrap.Modal.getOrCreateInstance(
-      document.getElementById('inputModal')
+    document.getElementById('inputModal')
   );
+
+  let recordTable = null;
+  let yearTable = null;
 
   function init() {
     document.getElementById('loading').style.display = 'block';
+
     google.script.run.withSuccessHandler(function(user) {
       if (!user.handlerName) {
         document.getElementById('setupBox').style.display = 'block';
@@ -169,263 +163,592 @@
       } else {
         document.getElementById('setupBox').style.display = 'none';
         document.getElementById('mainBox').style.display = 'block';
-        document.getElementById('whoami').innerText = '目前身分: ' + user.handlerName + '(' + user.email + ')';
+
+        document.getElementById('whoami').innerText =
+          '目前身分: ' + user.handlerName + '(' + user.email + ')';
+
         window._user = user.handlerName;
         document.getElementById('loading').style.display = 'none';
         loadRecords();
       }
     }).withFailureHandler(showErr).getCurrentUser();
-    //document.getElementById('loading').style.display = 'none';
   }
 
   function saveHandlerName() {
     const name = document.getElementById('handlerNameInput').value.trim();
     if (!name) return;
-    google.script.run.withSuccessHandler(init).withFailureHandler(showErr).setHandlerName(name);
+
+    google.script.run
+      .withSuccessHandler(init)
+      .withFailureHandler(showErr)
+      .setHandlerName(name);
   }
 
   function loadRecords() {
     document.getElementById('loading').style.display = 'block';
-    google.script.run.withSuccessHandler(renderTable).withFailureHandler(showErr).getMyRecords();
+
+    google.script.run
+      .withSuccessHandler(renderTable)
+      .withFailureHandler(showErr)
+      .getMyRecords();
+
     inputmodal.hide();
-   
-  }
-  function addnew(){
-      resetForm();
-      inputmodal.show();
   }
 
+  function addnew() {
+    resetForm();
+    inputmodal.show();
+  }
 
+  function tableOptions(data, columns) {
+    return {
+      data,
+      columns,
+      layout: 'fitData',
+
+      // Excel 式儲存格範圍選取
+      selectableRange: 1,
+      selectableRangeColumns: true,
+      selectableRangeRows: false,
+      selectableRangeClearCells: false,
+      selectableRangeInitializeDefault: false,
+
+      // 點欄名選取欄位；點排序箭頭排序
+      headerSortClickElement: 'icon',
+
+      // 僅複製選取範圍
+      clipboard: 'copy',
+      clipboardCopyRowRange: 'range',
+      clipboardCopyStyled: false,
+      clipboardCopyConfig: {
+        columnHeaders: false,
+        rowHeaders: false
+      },
+
+      placeholder: '目前沒有資料',
+
+      columnDefaults: {
+        formatter: 'textarea',
+        variableHeight: true,
+        headerFilter: 'input',
+        headerFilterPlaceholder: '搜尋…',
+        headerFilterFunc: 'like'
+      }
+    };
+  }
+
+  function statusFormatter(cell) {
+    const badge = document.createElement('span');
+
+    badge.className =
+      cell.getValue() === '結案' ? 'badge-old' : 'badge-latest';
+
+    badge.textContent =
+      cell.getValue() == null ? '' : String(cell.getValue());
+
+    return badge;
+  }
+
+  function recordColumns() {
+    return [
+      { title: '購案名稱', field: 'planName' ,frozen: true},
+      { title: '承攬廠商', field: 'contractor' },
+      { title: '聯絡人', field: 'contectName' },
+      { title: '開案日期', field: 'startDate' },
+      { title: '結案日期', field: 'endDate' },
+      { title: '金額(千元)', field: 'amount', sorter: 'number',headerFilter: false },
+      {
+        title: '分配(金額__比例__日期)',
+        field: 'yrAmount',
+        width: 230
+      },
+      {
+        title: '分攤計畫',
+        field: 'otherAmount',
+      },
+      { title: '採購案號', field: 'planNo' },
+      { title: '類型', field: 'planType' },
+      { title: '備註', field: 'remark', width: 100 },
+      {
+        title: '狀態',
+        field: 'status',
+        formatter: statusFormatter
+      },
+      { title: '更新日期', field: 'timestamp', width: 180 },
+      {
+        title: '功能',
+        headerSort: false,
+        headerFilter: false,
+        formatter: cell => {
+          if (cell.getRow().getData().status === '結案') return '';
+
+          const button = document.createElement('button');
+          button.type = 'button';
+          button.textContent = '修改';
+
+          return button;
+        },
+        cellClick: (event, cell) => {
+          if (event.target.closest('button')) {
+            reuseRecord(cell.getRow().getData()._recordIndex);
+          }
+        }
+      }
+    ];
+  }
 
   function renderTable(records) {
     window._records = records;
-    const tbody = document.querySelector('#recordTable tbody');
-    tbody.innerHTML = '';
-    
-    records.forEach((r, idx) => {
-      const tr = document.createElement('tr');
-      const statusHtml = r.status === '結案'
-        ? '<span class="badge-old">'+escapeHtml(r.status)+'</span>'
-        : '<span class="badge-latest">'+escapeHtml(r.status)+'</span>';
-      tr.innerHTML =
-        '<td>' + escapeHtml(r.planName) + '</td>' +
-        '<td>' + escapeHtml(r.contractor) + '</td>' +
-        '<td>' + escapeHtml(r.contectName) + '</td>' +
-        '<td>' + escapeHtml(r.startDate) + '</td>' +
-        '<td>' + escapeHtml(r.endDate) + '</td>' +
-        '<td>' + escapeHtml(String(r.amount)) + '</td>' +
-        '<td>' + escapeHtml(r.yrAmount) + '</td>' +
-        '<td>' + r.planType+ '</td>' +
-        '<td>' + escapeHtml(r.otherPlan) + '</td>' +
-        '<td>' + escapeHtml(r.otherAmount) + '</td>' +
-        '<td>' + escapeHtml(r.planNo) + '</td>' +
-        '<td>' + escapeHtml(r.remark) + '</td>'+ 
-        '<td>' + statusHtml + '</td>'+       
-        '<td>' + escapeHtml(r.timestamp) + '</td>' ;
-      if(r.status != '結案'){
-        tr.innerHTML += '<td><button onclick="reuseRecord(' + idx + ')">修改</button></td>';
-      }
-      tbody.appendChild(tr);
-    });
+
+    const data = records.map((record, index) => ({
+      ...record,
+      _recordIndex: index
+    }));
+
+    if (!recordTable) {
+      recordTable = new Tabulator(
+        '#recordTable',
+        tableOptions(data, recordColumns())
+      );
+    } else {
+      recordTable.replaceData(data).catch(showErr);
+    }
+
     document.getElementById('loading').style.display = 'none';
   }
 
   function escapeHtml(s) {
-    return String(s == null ? '' : s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+    return String(s == null ? '' : s).replace(
+      /[&<>"]/g,
+      c => ({
+        '&': '&amp;',
+        '<': '&lt;',
+        '>': '&gt;',
+        '"': '&quot;'
+      }[c])
+    );
   }
 
-  // 把某一筆歷史紀錄的內容帶入表單,方便修改後「再新增一筆」,不會直接改到原本的列
   function reuseRecord(idx) {
     inputmodal.show();
+
     const r = window._records[idx];
     if (!r) return;
-    document.getElementById('formTitle').innerText = '更新「' + r.planName + '」(送出後會新增一筆最新紀錄)';
+
+    document.getElementById('formTitle').innerText =
+      '更新「' + r.planName + '」(送出後會新增一筆最新紀錄)';
+
     document.getElementById('planName').value = r.planName;
     document.getElementById('contractor').value = r.contractor;
     document.getElementById('contectName').value = r.contectName;
     document.getElementById('amount').value = r.amount;
     document.getElementById('startDate').value = r.startDate;
     document.getElementById('endDate').value = r.endDate;
-    
-    document.getElementById('otherPlan').value = r.otherPlan;
-    document.getElementById('otherAmount').value = r.otherAmount;
     document.getElementById('planNo').value = r.planNo;
     document.getElementById('remark').value = r.remark;
     document.getElementById('status').value = r.status;
 
     str2payform(r.yrAmount);
+    calLastamount();
   }
 
-
-
   function removeRecord(idx) {
-    google.script.run.withSuccessHandler(loadRecords).withFailureHandler(showErr).removeRecords(idx);
+    google.script.run
+      .withSuccessHandler(loadRecords)
+      .withFailureHandler(showErr)
+      .removeRecords(idx);
   }
 
   function resetForm() {
-    document.getElementById('formTitle').innerText = '新增 / 更新一筆紀錄';
-    var formkey = ['planName','contractor','contectName', 'startDate','endDate','amount','otherPlan','otherAmount','planNo','remark','status'];
-    formkey.forEach(id => document.getElementById(id).value = '');
+    document.getElementById('formTitle').innerText =
+      '新增 / 更新一筆紀錄';
+
+    const formkey = [
+      'planName',
+      'contractor',
+      'contectName',
+      'startDate',
+      'endDate',
+      'amount',
+      'planNo',
+      'remark',
+      'status'
+    ];
+
+    formkey.forEach(id => {
+      document.getElementById(id).value = '';
+    });
+
+    document.getElementById('payinfo').innerHTML = '';
     document.getElementById('paytimes').value = '1';
-    document.getElementById('paytimes').dispatchEvent(new Event('change')); // 觸發事件
+    document.getElementById('paytimes')
+      .dispatchEvent(new Event('change'));
 
+    document.getElementById('other_payinfo').innerHTML = '';
+    document.getElementById('other_paytimes').value = '0';
+    document.getElementById('other_paytimes')
+      .dispatchEvent(new Event('change'));
   }
 
-  function payform2str(){
-    const count = parseInt( document.getElementById('paytimes').value, 10);
-    let   paystr = '';
-    for (let idx = 0; idx < count; idx++){
-       const amount = document.querySelector(`.amount-input[data-index="${idx}"]`).value;
-       const ratio = document.querySelector(`.ratio-input[data-index="${idx}"]`).value;       
-       const date = document.querySelector(`.date-input[data-index="${idx}"]`).value;
-       if (idx==0){
-         paystr = amount+'__'+ratio.padStart(2, '0')+'__'+date;  
-       }
-       else{
-         paystr += '\n'+amount+'__'+ratio.padStart(2, '0')+'__'+date;
-       }
-       
-
-    }
-    return paystr
-  }
-
-  function search(){
-    const yr = document.getElementById('selectyr').value;
-    google.script.run.withSuccessHandler(showsearch).withFailureHandler(showErr).searchMasteryr(yr);
-  }
-
-  function showsearch(records){
-    window._searchRecords = records;
-    const tbody = document.querySelector('#yearTable tbody');
-    tbody.innerHTML = '';
+  function payform2str(amountType) {
     
-    records.forEach((r, idx) => {
-      const tr = document.createElement('tr');
-      
-      tr.innerHTML =
-        '<td>' + escapeHtml(r.planName) + '</td>' +
-        '<td>' + escapeHtml(r.startDate) + '</td>' +
-        '<td>' + escapeHtml(r.endDate) + '</td>' +
-        '<td>' + escapeHtml(String(r.amount)) + '</td>' +
-        '<td>' + escapeHtml(r.yrAmount) + '</td>' +
-        '<td>' + escapeHtml(r.otherPlan)+':'+escapeHtml(r.otherAmount) + '</td>' +
-        '<td>' + escapeHtml(r.remark) + '</td>'+ 
-        '<td>' + escapeHtml(r.status) + '</td>';      
-      for (let i = 0 ; i < 12 ; i++){
-        tr.innerHTML +='<td>' + escapeHtml(r.monthDetail[i]) + '</td>';
+    let paystr = '';
+    
+    if (amountType == 'main'){
+      const count = parseInt(
+        document.getElementById('paytimes').value,
+        10
+      );
+
+      for (let idx = 0; idx < count; idx++) {
+        const amount = document.querySelector(
+          `.amount-input[data-index="${idx}"]`
+        ).value;
+
+        const ratio = document.querySelector(
+          `.ratio-input[data-index="${idx}"]`
+        ).value;
+
+        const date = document.querySelector(
+          `.date-input[data-index="${idx}"]`
+        ).value;
+
+        if (idx === 0) {
+          paystr = amount + '__' + ratio.padStart(2, '0') + '__' + date;
+        } else {
+          paystr += '\n' + amount + '__' + ratio.padStart(2, '0') + '__' + date;
+        }
+      }
+    }
+    else if(amountType == 'other'){
+      const count = parseInt(
+        document.getElementById('other_paytimes').value,
+        10
+      );
+
+      for (let idx = 0; idx < count; idx++) {
+        const amount = document.querySelector(
+          `.other-amount-input[data-index="${idx}"]`
+        ).value;
+
+        const plan = document.querySelector(
+          `.other-plan-input[data-index="${idx}"]`
+        ).value;
+
+        const date = document.querySelector(
+          `.other-date-input[data-index="${idx}"]`
+        ).value;
+
+        if (idx === 0) {
+          paystr = amount + '__' + plan + '__' + date;
+        } else {
+          paystr += '\n' + amount + '__' + plan + '__' + date;
+        }
+      }
+    }
+
+    return paystr;
+  }
+
+  function search() {
+    const yr = document.getElementById('selectyr').value;
+
+    google.script.run
+      .withSuccessHandler(showsearch)
+      .withFailureHandler(showErr)
+      .searchMasteryr(yr);
+  }
+
+  function yearColumns() {
+    const columns = [
+      { title: '購案名稱', field: 'planName' ,frozen: true },
+      { title: '開案日期', field: 'startDate' },
+      { title: '結案日期', field: 'endDate' },
+      {
+        title: '合計金額(千元)',
+        field: 'amount',
+        sorter: 'number',
+        headerFilter: false,
+        bottomCalc:"sum", 
+      },
+      { title: '分配', field: 'yrAmount', width: 230 },
+      { title: '分攤計畫', field: 'sharedPlan', width: 180 },
+      { title: '備註', field: 'remark', width: 100 },
+      { title: '狀態', field: 'status' }
+    ];
+
+    for (let month = 1; month <= 12; month++) {
+      columns.push({
+        title: month + '月',
+        field: '_month' + month,
+        bottomCalc:"sum", 
+      });
+    }
+
+    return columns;
+  }
+
+  function showsearch(records) {
+    window._searchRecords = records;
+
+    const data = records.map(record => {
+      const row = {
+        ...record,
+        sharedPlan: String(record.otherAmount ?? '')
+      };
+
+      for (let month = 1; month <= 12; month++) {
+        row['_month' + month] =
+          record.monthDetail?.[month - 1] ?? '';
       }
 
-      tbody.appendChild(tr);
+      return row;
     });
+
+    if (!yearTable) {
+      yearTable = new Tabulator(
+        '#yearTable',
+        tableOptions(data, yearColumns())
+      );
+    } else {
+      yearTable.replaceData(data).catch(showErr);
+    }
+
     document.getElementById('loading').style.display = 'none';
-  
   }
 
-  function str2payform(paystr){
-    const paylist = paystr.split("\n");
-    document.getElementById('paytimes').value = String(paylist.length);
-    document.getElementById('paytimes').dispatchEvent(new Event('change')); // 觸發事件
-    for (let idx = 0; idx < paylist.length; idx++){
-        const payinfo = paylist[idx].split("__");
-        document.querySelector(`.amount-input[data-index="${idx}"]`).value = payinfo[0];
-        document.querySelector(`.ratio-input[data-index="${idx}"]`).value = payinfo[1];
-        if(paylist[2] != ''){
-          document.querySelector(`.date-input[data-index="${idx}"]`).value = payinfo[2];
-        }
+  function str2payform(paystr) {
+    const paylist = paystr.split('\n');
+
+    document.getElementById('paytimes').value =
+      String(paylist.length);
+
+    document.getElementById('paytimes')
+      .dispatchEvent(new Event('change'));
+
+    for (let idx = 0; idx < paylist.length; idx++) {
+      const payinfo = paylist[idx].split('__');
+
+      document.querySelector(
+        `.amount-input[data-index="${idx}"]`
+      ).value = payinfo[0];
+
+      document.querySelector(
+        `.ratio-input[data-index="${idx}"]`
+      ).value = payinfo[1];
+
+      if (paylist[2] != '') {
+        document.querySelector(
+          `.date-input[data-index="${idx}"]`
+        ).value = payinfo[2];
+      }
     }
-    
   }
 
   function submitRecord() {
-    
-    
-    var formkey = ['planName','contractor','contectName', 'startDate','endDate','amount','otherPlan','otherAmount','planNo','remark','status'];
-    var record = {}
-    formkey.forEach(id => record[id] = document.getElementById(id).value );
-    record['yrAmount'] = payform2str();
-    record['handler']= window._user;
-    if( parseInt(document.getElementById('amount').value,10) >= 1500 ){
-       record['planType']= '公告';
+    const formkey = [
+      'planName',
+      'contractor',
+      'contectName',
+      'startDate',
+      'endDate',
+      'amount',
+      'planNo',
+      'remark',
+      'status'
+    ];
+
+    const record = {};
+
+    formkey.forEach(id => {
+      record[id] = document.getElementById(id).value;
+    });
+
+    record.yrAmount = payform2str('main');
+    record.otherAmount = payform2str('other');
+    record.handler = window._user;
+
+    if (parseInt(document.getElementById('amount').value, 10) >= 1500) {
+      record.planType = '公告';
+    } else {
+      record.planType = '';
     }
-    else{
-       record['planType']= '';
-    }
+
     if (!record.planName) {
       showMsg('請填寫計劃名');
       return;
     }
+
     showMsg('');
     document.getElementById('loading').style.display = 'block';
+
     google.script.run.withSuccessHandler(function() {
       resetForm();
       loadRecords();
     }).withFailureHandler(showErr).addRecord(record);
-    
   }
 
   function showMsg(text) {
     document.getElementById('msg').innerText = text;
   }
+
   function showErr(err) {
     showMsg('錯誤: ' + err.message);
   }
 
-  // 建立分期金額輸入的事件
-  document.getElementById('paytimes').addEventListener('change', function () {
-  const count = parseInt(this.value, 10) || 0;
-  const container = document.getElementById('payinfo');
-  container.innerHTML = ''; // 先清空舊的區塊
+  // 付款與外部支應共用分期列產生及保留輸入值的邏輯。
+  document.getElementById('paytimes')
+    .addEventListener('change', function() {
+      renderPaymentRows('payinfo', this.value, '', 'amount');
+    });
 
-  for (let i = 0; i < count; i++) {
-    const div = document.createElement('div');
-    div.className = 'form-payinfo';
-    div.innerHTML = `
-      <span>第 ${i + 1} 期</span>
-      <input type="number" class="ratio-input" data-index="${i}" placeholder="比例(%)" step="0.01">
-      <input type="number" class="amount-input" data-index="${i}" placeholder="金額" step="1">
-      <span>執行日期</span>
-      <input type="date" class="date-input" data-index="${i}">
-    `;
-    container.appendChild(div);
+  document.getElementById('other_paytimes')
+    .addEventListener('change', function() {
+      renderPaymentRows('other_payinfo', this.value, 'other-', null);
+    });
+
+  function renderPaymentRows(containerId, countValue, prefix, totalId) {
+    const count = parseInt(countValue, 10) || 0;
+    const container = document.getElementById(containerId);
+    const fieldName = totalId ? 'ratio' : 'plan';
+    
+    const previousValues = Array.from(
+      container.querySelectorAll('.form-payinfo'),
+      row => ({
+        [fieldName]: row.querySelector(
+          `.${prefix}${fieldName}-input`
+        ).value,
+        amount: row.querySelector(
+          `.${prefix}amount-input`
+        ).value,
+        date: row.querySelector(
+          `.${prefix}date-input`
+        ).value
+      })
+    );
+
+    container.innerHTML = '';
+
+    for (let i = 0; i < count; i++) {
+      const div = document.createElement('div');
+      div.className = 'form-payinfo';
+
+      div.innerHTML = `
+        <span>第 ${i + 1} 期:執行日期</span> 
+        <input type="date"
+               class="${prefix}date-input"
+               data-index="${i}">
+        ${totalId
+          ? `<input type="number"
+                    class="${prefix}ratio-input"
+                    data-index="${i}"
+                    placeholder="比例(%)"
+                    step="0.01">`
+          : `<input type="text"
+                    class="${prefix}plan-input"
+                    data-index="${i}"
+                    placeholder="案名">`}
+        <input type="number"
+               class="${prefix}amount-input"
+               data-index="${i}"
+               placeholder="金額"
+               step="1">
+       
+      `;
+
+      if (previousValues[i]) {
+        div.querySelector(
+          `.${prefix}${fieldName}-input`
+        ).value = previousValues[i][fieldName];
+
+        div.querySelector(
+          `.${prefix}amount-input`
+        ).value = previousValues[i].amount;
+
+        div.querySelector(
+          `.${prefix}date-input`
+        ).value = previousValues[i].date;
+        
+      }
+
+      container.appendChild(div);
+    }
+
+    // 外部支應的案名為文字，不綁定比例與金額連動。
+    if (totalId) {
+      bindLinkedInputs(container, prefix, totalId);
+      
+    }
+    calLastamount();
   }
 
-  bindLinkedInputs(); // 每次重新產生後,要重新綁定連動事件
-});
+  function calLastamount(){
+      const container = document.getElementById('payinfo');
+      const prefix    = '';
+      const previousValues = Array.from(
+        container.querySelectorAll('.form-payinfo'),
+        row => ({
+          amount: row.querySelector(
+            `.${prefix}amount-input`
+          ).value
 
-// 綁定「比例 ↔ 金額」的雙向連動
-function bindLinkedInputs() {
-  document.querySelectorAll('.ratio-input').forEach(ratioInput => {
-    ratioInput.addEventListener('input', function () {
-      const idx = this.dataset.index;
-      const totalAmount = parseInt( document.getElementById('amount').value,10) || 0;
-      const amountInput = document.querySelector(`.amount-input[data-index="${idx}"]`);
-      const ratio = parseFloat(this.value);
-      if (!isNaN(ratio)) {
-        amountInput.value = (totalAmount * ratio / 100).toFixed(3);
+        })
+      );
+      
+      var lastAmount = parseFloat(document.getElementById('amount').value);
+
+      for (let i = 0; i < previousValues.length ; i++) {
+          console.log(lastAmount,previousValues[i].amount)
+          if(parseFloat(previousValues[i].amount)){
+            lastAmount = lastAmount - parseFloat(previousValues[i].amount);
+          }
       }
+      document.getElementById('lastAmount').innerHTML=  String(lastAmount) ;
+  }
+
+  function bindLinkedInputs(container, prefix, totalId) {
+    container.querySelectorAll('.form-payinfo').forEach(row => {
+      const ratioInput = row.querySelector(
+        `.${prefix}ratio-input`
+      );
+
+      const amountInput = row.querySelector(
+        `.${prefix}amount-input`
+      );
+
+      ratioInput.addEventListener('change', function() {
+        const totalAmount = parseInt(
+          document.getElementById(totalId).value,
+          10
+        ) || 0;
+
+        const ratio = parseFloat(this.value);
+
+        if (!isNaN(ratio)) {
+          amountInput.value =
+            (totalAmount * ratio / 100).toFixed(3);
+        }
+        calLastamount();
+      });
+
+      amountInput.addEventListener('change', function() {
+        const totalAmount = parseInt(
+          document.getElementById(totalId).value,
+          10
+        ) || 0;
+
+        const amount = parseFloat(this.value);
+
+        if (!isNaN(amount) && totalAmount > 0) {
+          ratioInput.value =
+            (amount / totalAmount * 100).toFixed(1);
+        }
+        calLastamount();
+      });
     });
-  });
-
-  document.querySelectorAll('.amount-input').forEach(amountInput => {
-    amountInput.addEventListener('input', function () {
-      const idx = this.dataset.index;
-      const totalAmount = parseInt( document.getElementById('amount').value,10) || 0;
-      const amountInput = document.querySelector(`.amount-input[data-index="${idx}"]`);
-      const ratioInput = document.querySelector(`.ratio-input[data-index="${idx}"]`);
-      const amount = parseFloat(this.value);
-      if (!isNaN(amount) && totalAmount > 0) {
-        ratioInput.value = (amount / totalAmount * 100).toFixed(1);
-      }
-    });
-  });
-}
-
-
+  }
 
   init();
 </script>
 </body>
 </html>
-
-
